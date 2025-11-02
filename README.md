@@ -1,7 +1,6 @@
 # GitHub Stars Crawler
 
 This project automatically crawls public GitHub repositories using the **GitHub GraphQL API** and stores their star counts in a **PostgreSQL database**.  
-It was developed as part of a **Software Engineering Take-Home Assignment**.
 
 ---
 
