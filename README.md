@@ -1,18 +1,18 @@
-# 🚀 GitHub Stars Crawler
+# GitHub Stars Crawler
 
 This project automatically crawls public GitHub repositories using the **GitHub GraphQL API** and stores their star counts in a **PostgreSQL database**.  
 It runs entirely within **GitHub Actions** and supports **parallel crawling** for faster performance.
 
 ---
 
-## 📘 Overview
+## Overview
 
 The system connects to the **GitHub GraphQL API**, fetches repository data (ID, name, owner, stars, etc.), and stores it into a PostgreSQL database.  
 Data is automatically exported as a **CSV artifact** after every workflow run.
 
 ---
 
-## ✨ Features
+## Features
 
 - Fetches up to **100K+ repositories** (configurable to 500M+)
 - Uses **SQLAlchemy ORM** instead of raw SQL
