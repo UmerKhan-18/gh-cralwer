@@ -1,36 +1,43 @@
-# GitHub Stars Crawler
+# 🚀 GitHub Stars Crawler
 
 This project automatically crawls public GitHub repositories using the **GitHub GraphQL API** and stores their star counts in a **PostgreSQL database**.  
+It runs entirely within **GitHub Actions** and supports **parallel crawling** for faster performance.
 
 ---
 
-## Overview
+## 📘 Overview
 
-The system connects to the GitHub GraphQL API, fetches repositories in batches, and writes their details (ID, owner, name, star count, etc.) into a PostgreSQL database.  
-Everything runs automatically inside **GitHub Actions**, so no local setup or database installation is required.
+The system connects to the **GitHub GraphQL API**, fetches repository data (ID, name, owner, stars, etc.), and stores it into a PostgreSQL database.  
+Data is automatically exported as a **CSV artifact** after every workflow run.
+
+---
+
+## ✨ Features
+
+- Fetches up to **100K+ repositories** (configurable to 500M+)
+- Uses **SQLAlchemy ORM** instead of raw SQL
+- Stores data in **PostgreSQL**
+- Handles **pagination**, **rate limits**, and **automatic retries**
+- **Parallel fetching** – configurable number of threads via environment variable
+- Generates and uploads a **CSV dump artifact** in each workflow run
+- Modular and production-ready folder structure
 
 ---
 
-## Features
-
-- Fetches up to **100,000 repositories** via the **GraphQL API**
-- Stores repository data in **PostgreSQL**
-- Handles **pagination**, **rate limits**, and **retries**
-- Uses **UPSERT** for efficient updates (no duplicates)
-- Runs completely in **GitHub Actions**
-- Generates and uploads a **database dump (artifact)** after every run
-
----
 
 ## Architecture
 
-GitHub GraphQL API → Python Crawler → PostgreSQL (Service Container) → Database Dump Artifact
+GitHub GraphQL API → Python Crawler (Parallel Threads)
+↓
+PostgreSQL (ORM via SQLAlchemy)
+↓
+CSV Dump Artifact (Uploaded by GitHub Actions)
 
 ---
 
 ## Database Schema
 
-The schema is defined in `src/schema.sql`.
+The schema is defined via ORM in `src/db.py`.
 
 ```sql
 CREATE TABLE IF NOT EXISTS repos (
@@ -52,60 +59,79 @@ CREATE INDEX IF NOT EXISTS idx_repos_last_crawled ON repos(last_crawled);
 
 - repo_id → unique GitHub identifier (used for upserts)
 - metadata → flexible JSON column for future fields like forks, issues, PRs
-- ON CONFLICT (repo_id) DO UPDATE → ensures efficient updates
-- Crawler (crawl_stars.py)
-  The crawler connects to GitHub’s GraphQL API using the built-in GitHub Actions token (${{ secrets.GITHUB_TOKEN }}).
+- last_crawled → supports incremental crawling
 
 ### Responsibilities
 
-- Fetch repository data using GraphQL
-- Insert or update rows in PostgreSQL
-- Handle pagination and rate limits
-- Commit data after each batch
+- Fetch repository data from **GitHub GraphQL API**  
+- Insert or update rows in **PostgreSQL** using **SQLAlchemy ORM**  
+- Handle **pagination**, **rate limits**, and **retries**  
+- Support **parallel crawling** for faster throughput  
+- Commit data in safe, consistent batches  
+- Export final dataset as a **CSV artifact** after each run  
+
+---
 
 # GitHub Actions Workflow
 
-The entire pipeline runs automatically using the workflow file:
-.github/workflows/crawl.yml
+The entire pipeline runs automatically via the workflow file:  
+`.github/workflows/crawl.yml`
+
+---
 
 ## Workflow Steps
 
-- Checkout the repository
-- Setup Python
-- Start PostgreSQL service container
-- Apply database schema (setup.sql)
-- Run crawler script (crawl_stars.py)
-- Dump database contents to dump.sql
-- Upload dump as an artifact
+1. **Checkout the repository**  
+2. **Setup Python environment**  
+3. **Start PostgreSQL service container**  
+4. **Apply database schema (`setup.sql`)**  
+5. **Run the crawler script (`main.py`)**  
+6. **Export database contents to CSV (`repos_dump.csv`)**  
+7. **Upload CSV as an artifact** for later download or inspection  
+
+---
 
 ### Trigger Options
 
-- Manual: Run from the Actions tab → “crawl-stars” → Run workflow
-- Automatic: Scheduled daily at 02:00 UTC
+- **Manual:** From GitHub → **Actions tab → “Crawl GitHub Repositories” → Run workflow**  
+- **Automatic:** Scheduled daily at **02:00 UTC** via CRON
 
-### Output Artifact (dump.sql)
+---
 
-- After each run, a file named dump.sql is uploaded as a GitHub Actions artifact.
-  
-  ```sql
-  INSERT INTO public.repos (repo_id, full_name, owner, name, stargazers_count, last_crawled, metadata)
-  VALUES ('MDEwOlJlcG9zaXRvcnkyMzI1Mjk4', 'torvalds/linux', 'torvalds', 'linux', 206128, '2025-11-02 02:09:10+00', '{}');
+### Output Artifact (repos_dump.csv)
 
+After each run, the crawler uploads a CSV file as a GitHub Actions artifact.
+
+Example contents:
+
+```csv
+repo_id,full_name,owner,name,stargazers_count,last_crawled,metadata
+MDEwOlJlcG9zaXRvcnkyMzI1Mjk4,torvalds/linux,torvalds,linux,206128,2025-11-02T02:09:10Z,{}
+MDEwOlJlcG9zaXRvcnkxMzI3NTA3MjQ=,codecrafters-io/build-your-own-x,codecrafters-io,build-your-own-x,432517,2025-11-02T02:09:10Z,{}
+```
 # Technologies Used
 
 - Python 3.10
 - PostgreSQL 15
-- GitHub Actions
-- GitHub GraphQL API
-- Libraries: requests, psycopg2-binary
+- SQLAlchemy ORM (database layer)
+- Requests (GraphQL API calls)
+- Pandas (CSV export)
+- GitHub Actions (automation pipeline)
+- ThreadPoolExecutor (parallel crawling)
+- GitHub GraphQL API v4
 
 # Project Structure
 
 ```pgsql
 .
-├── crawl_stars.py
+├── main.py
 ├── src/
-│ └── schema.sql
+│ ├── config.py # Environment config & constants
+│ ├── db.py # SQLAlchemy ORM setup & models
+│ ├── github_api.py # GitHub GraphQL API helper
+│ └── crawler.py # Main crawling logic (parallel)
+├── sql/
+│ └── setup.sql # DB schema
 ├── .github/
 │ └── workflows/
 │ └── crawl.yml
